@@ -1,0 +1,89 @@
+heat_template_version: 2016-10-14
+
+description: made from razor
+parameters:
+  image:
+    type: string
+    description: Name of image to use for servers
+
+resources:
+  network:
+    type: OS::Neutron::Net
+    properties:
+      admin_state_up: true
+      name: heat-network-2
+
+  subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      cidr: 172.28.2.0/24
+      gateway_ip: 172.28.2.1
+      name: heat-subnet-2
+      dns_nameservers: ["8.8.8.8"]
+      network: { get_resource: network }
+      ip_version: 4
+
+  router:
+    type: OS::Neutron::Router
+    properties:
+      external_gateway_info: {"network": external-net-2 }
+      name: heat-router-2
+
+  router_interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: { get_resource: router }
+      subnet: { get_resource: subnet }
+  
+  server_port:
+    type: OS::Neutron::Port
+    properties:
+      network: { get_resource: network }
+      fixed_ips:
+        - subnet_id: { get_resource: subnet }
+      security_groups:
+        - default
+        - { get_resource: security_group }
+
+  security_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      description: Add security group rules for server
+      name: heat-sg-2
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+          port_range_min: 22
+          port_range_max: 22
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: icmp
+  
+  keypair:
+    type: OS::Nova::KeyPair
+    properties:
+      name: heat-key-2
+      public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQChn2xUWkmHipE5HmPuHBhLg9nzR0vsR4q7p4V3n6Ur0ZF1vJdHGR/EIe6Zefn2uMsx6XsAZO7uB4IH+AeXyyylqzT51Zol33NW5djh/obWn8Ng8zevcaJ/1OoP0nOeALfDf91XHwl4wR0mN4v24UXVNJ8i914/bNczvBaMPj6zlPSiH7EdM1D6wmUHnvPV+RUA3s5DPIlbpauUKopSgguT/YTnyyajsOTSeNR+X31Q8PVlPYLJKJZDaQ+lwOYyD7A9xUl7aUNH8VxRgTvsuZbBpxHSPtpZTVnENUFc97blxywMS0U4d9i/mAeYUptxz0ZkAE4dDfLXnifwwK9BmdS/ razor@pod2-markoyanfyan12-controller
+  
+  flavor:
+    type: OS::Nova::Flavor
+    properties:
+      disk: 10
+      name: heat-flavor-2
+      ram: 512
+      vcpus: 2
+  
+  server_instance:
+    type: OS::Nova::Server
+    properties:
+      name: heat-instance-2
+      image: { get_param: image }
+      flavor: { get_resource: flavor }
+      key_name: { get_resource: keypair }
+      networks:
+        - port: { get_resource: server_port }
+
+  server_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: external-net-2
+      port_id: { get_resource: server_port }
